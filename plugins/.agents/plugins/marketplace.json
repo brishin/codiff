@@ -1,0 +1,12 @@
+{
+  "name": "codiff-local",
+  "interface": { "displayName": "Codiff Plugins" },
+  "plugins": [
+    {
+      "name": "codiff",
+      "source": { "source": "local", "path": "./codiff" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Developer Tools"
+    }
+  ]
+}

@@ -3631,7 +3631,7 @@ export function ReviewCodeView({
         diffStyle,
         enableGutterUtility: !isReadOnly,
         enableLineSelection: !isReadOnly,
-        expandUnchanged: expandUnchanged && loadDiffFiles != null,
+        expandUnchanged,
         expansionLineCount: diffContextExpansionLineCount,
         hunkSeparators: 'line-info-basic',
         itemMetrics,

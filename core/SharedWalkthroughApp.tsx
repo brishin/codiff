@@ -187,6 +187,7 @@ const disabledCommitMessage = async (): Promise<WalkthroughCommitMessageResult> 
 
 export type ReviewSurfaceProps = {
   commenting?: ReviewCommenting;
+  expandUnchanged?: boolean;
   externalUrl?: string;
   gitIdentity?: GitIdentity | null;
   initialMode?: ReviewMode;
@@ -227,6 +228,11 @@ export type ReviewSurfaceProps = {
   snapshot: SharedWalkthroughSnapshot;
   sourceDescriptionFooterAside?: ReactNode;
   title?: string;
+  walkthroughGeneration?: {
+    onGenerateWalkthrough: () => Promise<void> | void;
+    walkthroughError?: string | null;
+    walkthroughStatus: ReviewWalkthroughStatus;
+  };
 };
 
 const mobileSidebarMediaQuery = '(max-width: 720px)';
@@ -237,6 +243,7 @@ const shouldCollapseSidebarInitially = () =>
 
 export function ReviewSurface({
   commenting,
+  expandUnchanged = false,
   externalUrl,
   gitIdentity = null,
   initialMode,
@@ -251,7 +258,9 @@ export function ReviewSurface({
   snapshot,
   sourceDescriptionFooterAside,
   title,
+  walkthroughGeneration,
 }: ReviewSurfaceProps) {
+  const generation = walkthroughGeneration ?? interactive;
   const canComment = commenting?.canComment ?? Boolean(interactive);
   const deleteShare = useCallback(async () => {
     if (
@@ -419,7 +428,7 @@ export function ReviewSurface({
   const [walkthroughRequestPending, setWalkthroughRequestPending] = useState(false);
   const walkthroughRequestPendingRef = useRef(false);
   const [walkthroughRequestId, setWalkthroughRequestId] = useState(0);
-  const interactiveRef = useRef(interactive);
+  const generationRef = useRef(generation);
   const handledHashTargetRef = useRef<string | null>(null);
 
   const visibleFiles = useMemo(
@@ -712,8 +721,8 @@ export function ReviewSurface({
       .finally(() => setPullRequestMergeSubmitting(false));
   }, [interactive, pullRequestMergeSubmitting]);
   useEffect(() => {
-    interactiveRef.current = interactive;
-  }, [interactive]);
+    generationRef.current = generation;
+  }, [generation]);
 
   useEffect(() => {
     if (!walkthroughRequestPending || walkthroughRequestId === 0) {
@@ -721,7 +730,7 @@ export function ReviewSurface({
     }
 
     let cancelled = false;
-    void Promise.resolve(interactiveRef.current?.onGenerateWalkthrough())
+    void Promise.resolve(generationRef.current?.onGenerateWalkthrough())
       .catch(() => {})
       .finally(() => {
         if (cancelled) {
@@ -737,8 +746,8 @@ export function ReviewSurface({
 
   const startWalkthroughGeneration = useCallback(() => {
     if (
-      !interactive ||
-      interactive.walkthroughStatus === 'generating' ||
+      !generation ||
+      generation.walkthroughStatus === 'generating' ||
       walkthroughRequestPendingRef.current
     ) {
       return;
@@ -747,12 +756,12 @@ export function ReviewSurface({
     walkthroughRequestPendingRef.current = true;
     setWalkthroughRequestPending(true);
     setWalkthroughRequestId((current) => current + 1);
-  }, [interactive]);
+  }, [generation]);
   useEffect(() => {
-    if (sidebarMode === 'walkthrough' && interactive?.walkthroughStatus === 'idle') {
+    if (sidebarMode === 'walkthrough' && generation?.walkthroughStatus === 'idle') {
       startWalkthroughGeneration();
     }
-  }, [interactive?.walkthroughStatus, sidebarMode, startWalkthroughGeneration]);
+  }, [generation?.walkthroughStatus, sidebarMode, startWalkthroughGeneration]);
   useEffect(() => {
     if (sidebarMode !== 'comments' || generalComments.length === 0) {
       return;
@@ -932,6 +941,7 @@ export function ReviewSurface({
     diffStyle: snapshot.preferences.diffStyle,
     disableWorkerPool: true,
     expandedReviewKeys,
+    expandUnchanged,
     focusCommentId,
     focusCommentRequest,
     gitIdentity,
@@ -1060,9 +1070,9 @@ export function ReviewSurface({
       : null;
   const repositoryLinkUrl = repositoryUrl ?? sourceExternalUrl;
   const walkthroughStatus =
-    walkthroughRequestPending && interactive?.walkthroughStatus !== 'ready'
+    walkthroughRequestPending && generation?.walkthroughStatus !== 'ready'
       ? 'generating'
-      : interactive?.walkthroughStatus;
+      : generation?.walkthroughStatus;
   const [walkthroughProgressRevision, setWalkthroughProgressRevision] = useState(0);
   const previousWalkthroughStatusRef = useRef(walkthroughStatus);
   useEffect(() => {
@@ -1074,13 +1084,13 @@ export function ReviewSurface({
     }
     previousWalkthroughStatusRef.current = walkthroughStatus;
   }, [walkthroughStatus]);
-  const walkthroughReady = !interactive || walkthroughStatus === 'ready';
+  const walkthroughReady = !generation || walkthroughStatus === 'ready';
   const walkthroughFailed = walkthroughStatus === 'failed';
   const walkthroughStatusTitle = walkthroughFailed
     ? 'Walkthrough unavailable'
     : 'Generating walkthrough…';
   const walkthroughStatusDescription = walkthroughFailed
-    ? (interactive?.walkthroughError ?? 'Fix the generation issue, then try again.')
+    ? (generation?.walkthroughError ?? 'Fix the generation issue, then try again.')
     : null;
   const shellTheme =
     snapshot.preferences.theme === 'system' ? undefined : snapshot.preferences.theme;

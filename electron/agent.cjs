@@ -28,6 +28,7 @@ const { readPiSessionContext } = require('./pi-session-context.cjs');
  *   onPartialText?: (delta: string) => void;
  *   onProgress?: (phase: import('../core/types.ts').WalkthroughProgressPhase) => void;
  *   reasoningEffort?: string;
+ *   fastMode?: boolean;
  *   timeoutMs?: number;
  * }} AgentOptions
  * @typedef {{

@@ -313,6 +313,10 @@ const mergeConfig = (raw) => {
         typeof rawSettings.openAIReasoningEffort === 'string'
           ? rawSettings.openAIReasoningEffort.trim()
           : defaults.settings.openAIReasoningEffort,
+      openAIFastMode:
+        typeof rawSettings.openAIFastMode === 'boolean'
+          ? rawSettings.openAIFastMode
+          : defaults.settings.openAIFastMode,
       opencodeModel:
         typeof rawSettings.opencodeModel === 'string'
           ? rawSettings.opencodeModel

@@ -436,7 +436,10 @@ const getAgentOptions = (agent) => ({
   fallbackModel: agent.fallbackModel,
   model: config.settings[agent.modelSettingKey],
   ...(agent.id === 'codex'
-    ? { reasoningEffort: config.settings.openAIReasoningEffort || undefined }
+    ? {
+        reasoningEffort: config.settings.openAIReasoningEffort || undefined,
+        fastMode: config.settings.openAIFastMode,
+      }
     : {}),
   /** @param {string} fallbackModel @param {string} originalModel */
   onModelFallback: async (fallbackModel, originalModel) => {

@@ -1,0 +1,14 @@
+{
+  "name": "codiff",
+  "version": "0.7.3",
+  "description": "Review this thread’s local checkout changes and generate guided walkthroughs with Codiff.",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "composerIcon": "./assets/icon.svg",
+    "logo": "./assets/icon.svg",
+    "displayName": "Codiff",
+    "shortDescription": "Review changes and guided walkthroughs",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Read"]
+  }
+}

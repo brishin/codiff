@@ -13,6 +13,7 @@ export type CodiffSettings = {
   editorCommand: string;
   expandUnchanged: boolean;
   lastRepositoryPath: string;
+  openAIFastMode: boolean;
   openAIModel: string;
   openAIReasoningEffort: string;
   opencodeModel: string;
