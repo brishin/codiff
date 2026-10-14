@@ -471,7 +471,7 @@ exit 1
         `model_reasoning_effort="${reasoningEffort}"`,
       );
     } else {
-      expect(codexArgs).not.toContain('-c');
+      expect(codexArgs.some((arg) => arg.startsWith('model_reasoning_effort='))).toBe(false);
     }
     expect(stderr).toBe('');
     expect(stdout).toBe(`${origin}/w/generated-walkthrough\n`);

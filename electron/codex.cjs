@@ -42,6 +42,7 @@ const CODEX_NOT_FOUND_MESSAGE =
  *   onModelFallback?: (fallbackModel: string, originalModel: string) => Promise<void> | void;
  *   onProgress?: (phase: import('../core/types.ts').WalkthroughProgressPhase) => void;
  *   reasoningEffort?: string;
+ *   fastMode?: boolean;
  *   timeoutMs?: number;
  * }} CodexOptions
  */
@@ -380,6 +381,15 @@ const runCodex = async (
   const model = normalizeOpenAIModel(options.model);
   const fallbackModels = getOpenAIModelFallbacks(model, options.fallbackModel);
   const timeoutMs = options.timeoutMs ?? CODEX_TIMEOUT_MS;
+  const serviceTier =
+    typeof options.fastMode === 'boolean' ? (options.fastMode ? 'fast' : 'default') : undefined;
+  const speedArgs = serviceTier
+    ? [
+        '-c',
+        `service_tier=${JSON.stringify(serviceTier)}`,
+        ...(options.fastMode ? ['-c', 'features.fast_mode=true'] : []),
+      ]
+    : [];
 
   /** @param {string} codexModel @returns {Promise<string>} */
   const invokeCodexExec = async (codexModel) => {
@@ -409,6 +419,7 @@ const runCodex = async (
           ...(reasoningEffort
             ? ['-c', `model_reasoning_effort=${JSON.stringify(reasoningEffort)}`]
             : []),
+          ...speedArgs,
           '--cd',
           repoRoot,
           '--sandbox',
@@ -515,6 +526,7 @@ const runCodex = async (
         [
           'app-server',
           '--stdio',
+          ...speedArgs,
           ...(reasoningEffort
             ? ['-c', `model_reasoning_effort=${JSON.stringify(reasoningEffort)}`]
             : []),
@@ -758,6 +770,7 @@ const runCodex = async (
           model: codexModel,
           sandbox: 'read-only',
           serviceName: 'codiff',
+          ...(serviceTier ? { serviceTier } : {}),
         });
         const threadId = thread?.thread?.id;
         if (typeof threadId !== 'string' || !threadId) {
@@ -767,6 +780,7 @@ const runCodex = async (
           approvalPolicy: 'never',
           cwd: repoRoot,
           effort: reasoningEffort,
+          ...(serviceTier ? { serviceTier } : {}),
           input: [
             {
               text: prompt,
