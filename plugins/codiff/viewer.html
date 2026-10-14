@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Codiff Diagnostics</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font: 14px system-ui;
+    }
+    body {
+      margin: 20px;
+    }
+    button {
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    pre {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font:
+        12px ui-monospace,
+        monospace;
+    }
+    .status {
+      opacity: 0.7;
+    }
+  </style>
+  <h2>Codiff Diagnostics</h2>
+  <p>
+    Compare the initial launch with a tool call from this tab. Selected metadata is saved locally.
+  </p>
+  <button id="inspect">Inspect from this tab</button>
+  <p class="status" id="status">Connecting to desktop host…</p>
+  <h3>UI host context</h3>
+  <pre id="host"></pre>
+  <h3>Latest server response</h3>
+  <pre id="result"></pre>
+  <script type="module">
+    let nextId = 0;
+    const pending = new Map();
+    const show = (id, value) => {
+      document.getElementById(id).textContent = JSON.stringify(value, null, 2);
+    };
+    const rpc = (method, params) =>
+      new Promise((resolve, reject) => {
+        const id = ++nextId;
+        const timer = setTimeout(() => {
+          pending.delete(id);
+          reject(new Error('Host request timed out'));
+        }, 15000);
+        pending.set(id, { resolve, reject, timer });
+        window.parent.postMessage({ jsonrpc: '2.0', id, method, params }, '*');
+      });
+    const summarize = (value) => ({
+      hostInfo: value.hostInfo,
+      hostContextKeys: Object.keys(value.hostContext ?? {}),
+      hostCapabilityKeys: Object.keys(value.hostCapabilities ?? {}),
+      displayMode: value.hostContext?.displayMode,
+      platform: value.hostContext?.platform,
+      theme: value.hostContext?.theme,
+    });
+    window.addEventListener('message', (event) => {
+      if (event.source !== window.parent) return;
+      const message = event.data;
+      if (message?.jsonrpc !== '2.0') return;
+      if (pending.has(message.id)) {
+        const request = pending.get(message.id);
+        pending.delete(message.id);
+        clearTimeout(request.timer);
+        if (message.error) request.reject(new Error(message.error.message));
+        else request.resolve(message.result);
+      }
+      if (message.method === 'ui/notifications/tool-result') show('result', message.params);
+      if (message.method === 'ui/notifications/host-context-changed')
+        show('host', summarize({ hostContext: message.params }));
+    });
+    const inspect = async () => {
+      show('result', await rpc('tools/call', { name: 'inspect_metadata', arguments: {} }));
+    };
+    document.getElementById('inspect').onclick = () =>
+      inspect().catch((error) => {
+        document.getElementById('status').textContent = error.message;
+      });
+    try {
+      const initialized = await rpc('ui/initialize', {
+        appInfo: { name: 'Codiff Diagnostics', version: '0.1.0' },
+        appCapabilities: {},
+        protocolVersion: '2026-01-26',
+      });
+      window.parent.postMessage(
+        { jsonrpc: '2.0', method: 'ui/notifications/initialized', params: {} },
+        '*',
+      );
+      const report = summarize(initialized);
+      show('host', report);
+      show('result', await rpc('tools/call', { name: 'report_ui_context', arguments: { report } }));
+      document.getElementById('status').textContent =
+        'Connected. Click Inspect to compare an app-originated call.';
+    } catch (error) {
+      document.getElementById('status').textContent = error.message;
+    }
+  </script>
+</html>

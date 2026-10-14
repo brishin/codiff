@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "codiff": {
+      "command": "node",
+      "args": ["./server.mjs"],
+      "cwd": ".",
+      "tool_timeout_sec": 1200
+    }
+  }
+}

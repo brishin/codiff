@@ -1,0 +1,62 @@
+.thread-view-positioner {
+  z-index: 100;
+}
+.thread-view-menu {
+  min-width: 240px;
+  max-height: var(--available-height);
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--file-border);
+  border-radius: 10px;
+  background: var(--code-bg);
+  color: var(--text);
+  font: 13px var(--font-sans);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 12%, transparent);
+}
+.thread-view-label {
+  padding: 6px 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.thread-view-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 30px;
+  padding: 4px 10px 4px 28px;
+  border-radius: 5px;
+  cursor: default;
+  outline: none;
+}
+.thread-view-item[data-highlighted] {
+  background: var(--hover-wash);
+}
+.thread-view-item[data-disabled] {
+  color: var(--muted);
+}
+.thread-view-check {
+  position: absolute;
+  left: 8px;
+  display: flex;
+}
+.thread-view-item kbd {
+  color: var(--muted);
+  font: inherit;
+}
+.thread-view-separator {
+  height: 1px;
+  margin: 6px 0;
+  background: var(--file-border);
+}
+.thread-review-menus {
+  display: flex;
+  gap: 8px;
+}
+.thread-agent-error {
+  max-width: 280px;
+  padding: 8px;
+  color: var(--danger);
+  font-size: 12px;
+}
