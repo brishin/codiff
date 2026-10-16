@@ -2,14 +2,15 @@
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { basename, join } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import process from 'node:process';
 import {
+  defaultCasesPath,
   getWalkthroughMetrics,
   nowMs,
   readCases,
+  resolveCaseRepo,
   resolveRunDir,
-  root,
   roundMs,
   writeJson,
 } from './lib.mjs';
@@ -23,13 +24,21 @@ const {
   readNarrativeWalkthrough,
   resolveNarrativeWalkthroughModel,
 } = require('../electron/narrative-walkthrough.cjs');
+const { resolveReviewUrl } = require('../electron/review-source.cjs');
 
 const args = process.argv.slice(2);
 const readOption = (name, fallback) => {
   const index = args.indexOf(name);
   return index === -1 ? fallback : args[index + 1];
 };
-const optionNames = new Set(['--case', '--effort', '--model', '--repetitions']);
+const optionNames = new Set([
+  '--agent',
+  '--case',
+  '--cases',
+  '--effort',
+  '--model',
+  '--repetitions',
+]);
 let label = '';
 for (let index = 0; index < args.length; index += 1) {
   if (optionNames.has(args[index])) {
@@ -44,16 +53,26 @@ const repetitions = Number(readOption('--repetitions', '2'));
 const caseFilter = readOption('--case', '');
 const effort = readOption('--effort', 'high');
 const productionDefaults = args.includes('--production-defaults');
-const configuredModel = readConfig().settings.openAIModel;
+const agentName = readOption('--agent', 'codex');
+const settings = readConfig().settings;
+const configuredModel = agentName === 'claude' ? settings.claudeModel : settings.openAIModel;
 const model = readOption(
   '--model',
-  productionDefaults ? getAgent('codex').defaultModel : configuredModel,
+  productionDefaults ? getAgent(agentName).defaultModel : configuredModel,
 );
+const customPrompt = args.includes('--custom-prompt') ? settings.walkthroughPrompt || '' : '';
+const casesPath = resolve(readOption('--cases', defaultCasesPath));
 const runDir = resolveRunDir(label);
-const cases = (await readCases()).filter((item) => !caseFilter || item.id === caseFilter);
+const cases = (await readCases(casesPath)).filter((item) => !caseFilter || item.id === caseFilter);
 
 if (!Number.isInteger(repetitions) || repetitions < 1) {
   throw new Error('--repetitions must be a positive integer.');
+}
+if (!['claude', 'codex'].includes(agentName)) {
+  throw new Error('--agent must be claude or codex.');
+}
+if (args.includes('--custom-prompt') && !customPrompt) {
+  throw new Error('--custom-prompt requires a walkthroughPrompt setting in the Codiff config.');
 }
 if (!['low', 'medium', 'high'].includes(effort)) {
   throw new Error('--effort must be low, medium, or high.');
@@ -64,6 +83,9 @@ if (cases.length === 0) {
 
 await mkdir(runDir, { recursive: true });
 await writeJson(join(runDir, 'run.json'), {
+  agent: agentName,
+  casesPath,
+  customPrompt: customPrompt || null,
   effort,
   label,
   model,
@@ -78,18 +100,28 @@ for (const evalCase of cases) {
     await mkdir(attemptDir, { recursive: true });
     await writeJson(join(attemptDir, 'case.json'), evalCase);
 
+    const repo = resolveCaseRepo(evalCase);
+    const source =
+      evalCase.pr != null
+        ? { provider: 'github', type: 'pull-request', url: resolveReviewUrl(repo, evalCase.pr) }
+        : { ref: evalCase.commit, type: 'commit' };
+    const baseAgent = getAgent(agentName);
     const stateStarted = nowMs();
-    const state = await readRepositoryState(root, {
-      ref: evalCase.commit,
-      type: 'commit',
-    });
+    const state = await readRepositoryState(repo, source);
     const stateMs = roundMs(nowMs() - stateStarted);
     const promptStarted = nowMs();
-    const expectedPrompt = buildNarrativeWalkthroughPrompt(state, null, 'Codex');
+    const expectedPrompt = buildNarrativeWalkthroughPrompt(
+      state,
+      null,
+      baseAgent.label,
+      customPrompt,
+    );
     const promptBuildMs = roundMs(nowMs() - promptStarted);
     await writeFile(join(attemptDir, 'prompt.txt'), expectedPrompt);
+    if (typeof state.source.description === 'string' && state.source.description.trim()) {
+      await writeFile(join(attemptDir, 'source-description.txt'), state.source.description);
+    }
 
-    const baseAgent = getAgent('codex');
     const caseModel = productionDefaults
       ? resolveNarrativeWalkthroughModel(state, baseAgent, model)
       : model;
@@ -136,6 +168,7 @@ for (const evalCase of cases) {
         reasoningEffort: effort,
       },
       null,
+      customPrompt,
     );
     const generationFinished = nowMs();
     const firstResponse = phases.find((event) => event.phase === 'response-received');

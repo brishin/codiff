@@ -7,8 +7,8 @@ import {
   average,
   listAttemptDirs,
   median,
-  readCases,
   readJson,
+  readRunCases,
   resolveRunDir,
   writeJson,
 } from './lib.mjs';
@@ -21,7 +21,7 @@ if (!label) {
 const runDir = resolveRunDir(label);
 const rows = [];
 
-for (const evalCase of await readCases()) {
+for (const evalCase of await readRunCases(runDir)) {
   const attempts = [];
   for (const attemptDir of await listAttemptDirs(runDir, evalCase.id)) {
     const meta = await readJson(join(attemptDir, 'meta.json'));
@@ -44,6 +44,9 @@ for (const evalCase of await readCases()) {
   rows.push({
     attempts: attempts.length,
     case: evalCase.id,
+    decisionCount: average(
+      successful.map((attempt) => attempt.meta.metrics?.decisionCount).filter(Number.isFinite),
+    ),
     firstResponseMs: median(
       successful.map((attempt) => attempt.meta.firstResponseMs).filter(Number.isFinite),
     ),
@@ -51,6 +54,9 @@ for (const evalCase of await readCases()) {
     hunkCount: successful[0]?.meta.metrics?.hunkCount ?? 0,
     inputTokens: median(
       successful.map((attempt) => attempt.meta.usage?.inputTokens).filter(Number.isFinite),
+    ),
+    keyDecisions: average(
+      attempts.map((attempt) => attempt.judge?.keyDecisions).filter(Number.isFinite),
     ),
     mainCoverage: average(successful.map((attempt) => attempt.meta.metrics?.mainCoverage ?? 0)),
     outputTokens: median(
@@ -68,6 +74,7 @@ const stateTimes = rows
   .map((row) => row.stateMs)
   .filter((value) => Number.isFinite(value) && value > 0);
 const summary = {
+  averageKeyDecisions: average(rows.map((row) => row.keyDecisions).filter(Number.isFinite)),
   averageQuality: average(rows.map((row) => row.quality).filter(Number.isFinite)),
   averageSuccessRate: average(rows.map((row) => row.successRate)),
   cases: rows.length,
@@ -80,11 +87,11 @@ await writeJson(join(runDir, 'summary.json'), { rows, summary });
 const lines = [
   `# Walkthrough eval: ${label}`,
   '',
-  '| Case | Attempts | Success | Hunks | State | Prompt | First response | Generation | Input | Output | Main coverage | Quality | Transport |',
-  '|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|',
+  '| Case | Attempts | Success | Hunks | State | Prompt | First response | Generation | Input | Output | Main coverage | Decisions | Quality | Key decisions | Transport |',
+  '|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|',
   ...rows.map(
     (row) =>
-      `| ${row.case} | ${row.attempts} | ${(row.successRate * 100).toFixed(0)}% | ${row.hunkCount} | ${Number.isFinite(row.stateMs) ? `${row.stateMs.toFixed(1)}ms` : 'n/a'} | ${Math.round(row.promptChars / 1000)}k | ${(row.firstResponseMs / 1000).toFixed(2)}s | ${(row.generationMs / 1000).toFixed(2)}s | ${Math.round(row.inputTokens)} | ${Math.round(row.outputTokens)} | ${(row.mainCoverage * 100).toFixed(0)}% | ${row.quality.toFixed(1)}/100 | ${row.transport} |`,
+      `| ${row.case} | ${row.attempts} | ${(row.successRate * 100).toFixed(0)}% | ${row.hunkCount} | ${Number.isFinite(row.stateMs) ? `${row.stateMs.toFixed(1)}ms` : 'n/a'} | ${Math.round(row.promptChars / 1000)}k | ${(row.firstResponseMs / 1000).toFixed(2)}s | ${(row.generationMs / 1000).toFixed(2)}s | ${Math.round(row.inputTokens)} | ${Math.round(row.outputTokens)} | ${(row.mainCoverage * 100).toFixed(0)}% | ${row.decisionCount.toFixed(1)} | ${row.quality.toFixed(1)}/100 | ${row.keyDecisions.toFixed(1)}/10 | ${row.transport} |`,
   ),
   '',
   '## Summary',

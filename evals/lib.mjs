@@ -1,5 +1,6 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 
@@ -12,8 +13,17 @@ export const runsRoot = join(root, 'evals', 'runs');
 export const nowMs = () => performance.now();
 export const roundMs = (value) => Math.round(value * 10) / 10;
 
-export const readCases = async () =>
-  JSON.parse(await readFile(join(root, 'evals', 'cases.json'), 'utf8'));
+export const defaultCasesPath = join(root, 'evals', 'cases.json');
+
+export const readCases = async (casesPath = defaultCasesPath) =>
+  JSON.parse(await readFile(casesPath, 'utf8'));
+
+// A run records the cases file it used so judge and report read the same cases.
+export const readRunCases = async (runDir) =>
+  readCases((await readJson(join(runDir, 'run.json')))?.casesPath || defaultCasesPath);
+
+export const resolveCaseRepo = (evalCase) =>
+  evalCase.repo ? resolve(evalCase.repo.replace(/^~(?=\/|$)/, homedir())) : root;
 
 export const resolveRunDir = (label) => resolve(runsRoot, label);
 
@@ -62,6 +72,7 @@ export const getWalkthroughMetrics = (state, walkthrough) => {
 
   return {
     chapterCount: walkthrough.chapters.length,
+    decisionCount: walkthrough.decisions?.length ?? 0,
     duplicateReferenceCount,
     groupCount: flattenWalkthroughGroups(walkthrough).length,
     hunkCount: allHunkIds.length,

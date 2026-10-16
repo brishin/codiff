@@ -18,6 +18,7 @@ const CHANGE_TYPES = new Set([
 const MAX_WALKTHROUGH_CHAPTERS = 6;
 const MAX_WALKTHROUGH_STOPS = 14;
 const MAX_HUNKS_PER_WALKTHROUGH_GROUP = 14;
+const MAX_WALKTHROUGH_DECISIONS = 4;
 
 const hunkGroupProperties = {
   changeType: { enum: [...CHANGE_TYPES], type: 'string' },
@@ -91,6 +92,22 @@ const narrativeWalkthroughSchema = {
       maxItems: MAX_WALKTHROUGH_CHAPTERS,
       type: 'array',
     },
+    decisions: {
+      description:
+        'Consequential design or architectural choices a reviewer must agree with, each linked to the main-path stops that implement it.',
+      items: {
+        additionalProperties: false,
+        properties: {
+          detail: { type: 'string' },
+          stopIds: { items: { type: 'string' }, type: 'array' },
+          title: { maxLength: 80, type: 'string' },
+        },
+        required: ['title', 'detail', 'stopIds'],
+        type: 'object',
+      },
+      maxItems: MAX_WALKTHROUGH_DECISIONS,
+      type: 'array',
+    },
     focus: { type: 'string' },
     kind: { const: 'narrative', type: 'string' },
     support: {
@@ -143,12 +160,14 @@ const narrativeWalkthroughGenerationSchema = {
         },
       },
     },
+    decisions: narrativeWalkthroughSchema.properties.decisions,
     focus: narrativeWalkthroughSchema.properties.focus,
     kind: narrativeWalkthroughSchema.properties.kind,
     title: narrativeWalkthroughSchema.properties.title,
     version: narrativeWalkthroughSchema.properties.version,
   },
-  required: ['version', 'kind', 'title', 'focus', 'chapters'],
+  // Requiring decisions makes the agent choose explicitly; an empty list is valid.
+  required: ['version', 'kind', 'title', 'focus', 'chapters', 'decisions'],
   type: 'object',
 };
 
@@ -216,6 +235,7 @@ module.exports = {
   MAX_WALKTHROUGH_CHAPTERS,
   MAX_WALKTHROUGH_STOPS,
   MAX_HUNKS_PER_WALKTHROUGH_GROUP,
+  MAX_WALKTHROUGH_DECISIONS,
   narrativeWalkthroughResponseSchema,
   narrativeWalkthroughSchema,
 };

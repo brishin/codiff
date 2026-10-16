@@ -36,6 +36,13 @@ choose.
   hunks, usually write 1-2 stops. Some ids are synthetic hunks for binary, deferred,
   metadata-only, or otherwise non-textual changes; treat them like normal hunk ids and explain why
   that review unit matters.
+- **`decisions[]`** — optional, 0-4 key decisions shown under the review focus: the
+  consequential design or architectural choices a reviewer must agree with, such as a module
+  boundary, a data-flow, caching, or storage strategy, a public contract change, a security or
+  privacy boundary, or a compatibility strategy. Each has a `title` naming the choice in
+  roughly 3-8 words, a 1-2 sentence `detail` with what was chosen and its consequence or
+  tradeoff, and `stopIds` linking the stops that implement it. Omit it, or leave it empty, for
+  mechanical or single-behavior changes.
 - **`notes[]`** — optional short header notes for individual focused hunks: `{ hunkId, body }`.
   Use these when a specific hunk needs a label under its file header.
 - **`support[]`** — changed hunks that should stay off the main path. Use it for generated files,
@@ -67,6 +74,9 @@ choose.
   headings, lists, or other block structure. Inline code is supported, though: wrap symbol names,
   file paths, flags, and other literals in backticks, e.g. `--walkthrough-file` or `renderInlineMarkdown`.
 - Avoid generic filler, broad assurance language, and meta-explanatory labels.
+- State a decision's reason only when the conversation, PR description, or code supports it.
+  Never invent rejected alternatives, benchmarks, or motives, and do not list renames, styling,
+  tests, or wiring as decisions.
 - Do not invent bugs, risks, tests, or validation. Describe what the diff and conversation
   actually support.
 - If a PR/MR description is available, use it only as author intent and orientation. Do not copy it
