@@ -49,6 +49,11 @@ export const flagDefinitions = [
   },
   { description: 'Show this help message and exit.', name: 'help', short: 'h', type: 'boolean' },
   {
+    description: 'Print the review as JSON instead of opening the app; add -w for a walkthrough.',
+    name: 'json',
+    type: 'boolean',
+  },
+  {
     argument: '<id>',
     description: 'Attach OpenCode session metadata to a walkthrough.',
     name: 'opencode-session',
@@ -127,6 +132,7 @@ const usageExamples = [
   { command: 'codiff -w a1b2c3d', description: 'Generate a narrative walkthrough for a commit.' },
   { command: 'codiff --share', description: 'Share local changes, or HEAD when clean.' },
   { command: 'codiff --share HEAD', description: 'Share a walkthrough for a commit.' },
+  { command: 'codiff --json -w', description: 'Print local changes and a walkthrough as JSON.' },
 ];
 
 export const getReviewSource = ({
@@ -459,6 +465,7 @@ export const parseArguments = (args) => {
     commitRef,
     ...(completionShell === null ? {} : { completionShell }),
     help: values.help === true,
+    ...(values.json === true ? { json: true } : {}),
     ...(pullRequestBranch ? { pullRequestBranch } : {}),
     pullRequestNumber,
     ...(pullRequestProvider ? { pullRequestProvider } : {}),
