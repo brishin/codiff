@@ -1,20 +1,16 @@
 // @ts-check
 
 const { readFileSync } = require('node:fs');
-const { getAgent } = require('./agent.cjs');
-const { readConfig, writeConfig } = require('./config.cjs');
+const { readConfig } = require('./config.cjs');
 const { createCloudflareAccessClient } = require('./cloudflare-access.cjs');
 const {
   readGitIdentity,
   readRepositoryState,
   readWalkthroughRepositoryState,
 } = require('./git-state.cjs');
-const {
-  normalizeNarrativeWalkthrough,
-  readNarrativeWalkthrough,
-} = require('./narrative-walkthrough.cjs');
+const { generateNarrativeWalkthrough } = require('./headless-review-export.cjs');
+const { normalizeNarrativeWalkthrough } = require('./narrative-walkthrough.cjs');
 const { uploadSharedSnapshot } = require('./shared-walkthrough-upload.cjs');
-const { mergeWalkthroughContexts, readWalkthroughContext } = require('./walkthrough-context.cjs');
 const { resolveWalkthroughShareTarget } = require('./walkthrough-sharing.cjs');
 
 /**
@@ -236,42 +232,14 @@ const generateAndShareWalkthrough = async ({
   walkthroughContextPath,
 }) => {
   const config = readConfig();
-  const agent = getAgent(agentOverride || config.settings.agentBackend);
   const [state, uploader] = await readGeneratedShareState(repositoryPath, source, config);
-  const sessionIds = {
-    claudeSessionId,
-    codexSessionId,
-    opencodeSessionId,
-    piSessionId,
-  };
-  const providedContext = walkthroughContextPath
-    ? readWalkthroughContext(walkthroughContextPath, codexSessionId)
-    : null;
-  const sessionContext = await agent.readSessionContext(sessionIds[agent.sessionLaunchOptionKey]);
-  const result = await readNarrativeWalkthrough(
+  const walkthrough = await generateNarrativeWalkthrough({
+    agent: agentOverride,
+    config,
+    sessionIds: { claudeSessionId, codexSessionId, opencodeSessionId, piSessionId },
     state,
-    agent,
-    {
-      fallbackModel: agent.fallbackModel,
-      model: config.settings[agent.modelSettingKey],
-      ...(agent.id === 'codex'
-        ? {
-            reasoningEffort: config.settings.openAIReasoningEffort || undefined,
-            fastMode: config.settings.openAIFastMode,
-          }
-        : {}),
-      onModelFallback: async (fallbackModel) => {
-        config.settings[agent.modelSettingKey] = fallbackModel;
-        writeConfig(config);
-      },
-    },
-    mergeWalkthroughContexts(providedContext, sessionContext),
-    config.settings.walkthroughPrompt,
-  );
-
-  if (result.status !== 'ready') {
-    throw new Error(result.reason || `${agent.label} could not generate a walkthrough.`);
-  }
+    walkthroughContextPath,
+  });
 
   return uploadWalkthrough({
     codiffVersion,
@@ -281,7 +249,7 @@ const generateAndShareWalkthrough = async ({
     serviceUrlOverride,
     state,
     uploader,
-    walkthrough: result.walkthrough,
+    walkthrough,
   });
 };
 

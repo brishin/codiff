@@ -21,3 +21,5 @@ out/
 source_strings.json
 tsconfig.tsbuildinfo
 vite.config.ts.timestamp-*
+# Written by Claude Code when it loads a plugin.
+plugins/claude/*/.claude-plugin/types/

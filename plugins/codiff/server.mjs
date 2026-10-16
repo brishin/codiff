@@ -112,14 +112,26 @@ const tools = [
     name: 'report_ui_context',
   },
 ];
+const checkoutSchema = {
+  additionalProperties: false,
+  properties: {
+    cwd: {
+      description:
+        'Absolute path of the checkout to review. Omit to use the host-supplied thread’s checkout.',
+      type: 'string',
+    },
+  },
+  type: 'object',
+};
 tools[1].description =
-  'View the current working-tree changes in this thread’s local checkout with Codiff.';
+  'View the current working-tree changes in this thread’s local checkout, or in `cwd`, with Codiff.';
+tools[1].inputSchema = checkoutSchema;
 tools[1]._meta.ui.resourceUri = reviewResourceUri;
 tools.push({
   _meta: { ui: { visibility: ['app'] } },
   annotations: { destructiveHint: false, openWorldHint: false, readOnlyHint: true },
-  description: 'Reload the current working-tree review for the host-supplied thread.',
-  inputSchema: { properties: {}, type: 'object' },
+  description: 'Reload the current working-tree review for the host-supplied thread or `cwd`.',
+  inputSchema: checkoutSchema,
   name: 'review_refresh',
 });
 for (const name of ['agent_settings_read', 'agent_settings_update']) {
@@ -153,8 +165,8 @@ tools.push({
   _meta: { ui: { visibility: ['app'] } },
   annotations: { destructiveHint: false, openWorldHint: true, readOnlyHint: true },
   description:
-    'Generate a walkthrough of this thread checkout using the configured Codiff agent and model. Sends the diff to that agent.',
-  inputSchema: { properties: {}, type: 'object' },
+    'Generate a walkthrough of this thread checkout, or `cwd`, using the configured Codiff agent and model. Sends the diff to that agent.',
+  inputSchema: checkoutSchema,
   name: 'review_walkthrough',
 });
 tools[2].inputSchema = {
@@ -236,6 +248,7 @@ const dispatch = async (method, params = {}) => {
     if (['review_thread', 'review_refresh', 'review_walkthrough'].includes(params.name)) {
       try {
         const review = await loadThreadReview(params._meta, {
+          cwd: params.arguments?.cwd,
           generateWalkthrough: params.name === 'review_walkthrough',
         });
         return {

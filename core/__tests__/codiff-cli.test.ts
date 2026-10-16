@@ -1521,3 +1521,50 @@ test('parseArguments reads base...target and base..target as a range', async () 
     expect(parseArguments(['nope...nada']).range).toBeUndefined();
   });
 });
+
+test('codiff --json prints walkthrough hunks without opening the app', async () => {
+  const repo = await realpath(await mkdtemp(join(tmpdir(), 'codiff-cli-json-')));
+  try {
+    await git(repo, ['init']);
+    await writeFile(join(repo, 'app.ts'), 'one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\n');
+    await writeFile(join(repo, 'pnpm-lock.yaml'), 'lockfileVersion: 9\n');
+    await git(repo, ['add', '.']);
+    await git(repo, ['commit', '-m', 'first']);
+    await writeFile(join(repo, 'app.ts'), 'ONE\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\n');
+    await git(repo, ['add', 'app.ts']);
+    await writeFile(join(repo, 'app.ts'), 'ONE\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nNINE\n');
+    await writeFile(join(repo, 'pnpm-lock.yaml'), 'lockfileVersion: 9\npackages: {}\n');
+
+    const { stdout } = await execFileAsync(process.execPath, ['bin/codiff.js', '--json', repo], {
+      cwd: resolve('.'),
+      encoding: 'utf8',
+      env: getGitTestEnvironment(),
+    });
+    const review = JSON.parse(stdout);
+
+    expect(review).toMatchObject({ kind: 'codiff-review', root: repo, walkthrough: null });
+    const app = review.files.find((file: { path: string }) => file.path === 'app.ts');
+    // Staged and unstaged edits are separate sections, so ids carry the section scope.
+    expect(app.hunks.map((hunk: { id: string }) => hunk.id)).toEqual([
+      'app.ts:staged:h1',
+      'app.ts:unstaged:h1',
+    ]);
+    expect(app.hunks[0].patch).toMatch(/^@@ .*\n-one\n\+ONE/);
+    const lockfile = review.files.find((file: { path: string }) => file.path === 'pnpm-lock.yaml');
+    // Generated files collapse into one synthetic hunk, as walkthroughs expect.
+    expect(lockfile).toMatchObject({ generated: true });
+    expect(lockfile.hunks).toMatchObject([{ id: 'pnpm-lock.yaml:unstaged:h1', kind: 'synthetic' }]);
+    expect(lockfile.hunks[0].patch).toContain('+packages: {}');
+  } finally {
+    await removeGitTestDirectory(repo);
+  }
+});
+
+test('codiff --json refuses modes that open or upload', async () => {
+  await expect(
+    execFileAsync(process.execPath, ['bin/codiff.js', '--json', '--share'], {
+      cwd: resolve('.'),
+      encoding: 'utf8',
+    }),
+  ).rejects.toMatchObject({ stderr: expect.stringContaining('--json cannot be combined') });
+});
