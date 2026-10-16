@@ -1,0 +1,15 @@
+{
+  "name": "codiff-pane",
+  "version": "0.1.0",
+  "description": "Codiff's review UI as a native Claude Code pane: file tree, diffs, pull requests, and guided walkthroughs.",
+  "author": { "name": "Brian Shin" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "codiffPath": {
+      "type": "string",
+      "title": "Codiff CLI",
+      "description": "The Codiff CLI to run: an executable, or a checkout's bin/codiff.js. Empty uses `codiff` on your PATH, or this repository's own CLI inside a Codiff checkout.",
+      "default": ""
+    }
+  }
+}

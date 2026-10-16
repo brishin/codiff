@@ -49,6 +49,8 @@ export default defineConfig({
       'web/.wrangler/',
       'web/node_modules/',
       'vite.config.ts.timestamp-*',
+      // Claude Code plugins type-check against the declarations Claude Code writes beside them.
+      'plugins/claude/',
     ],
     options: { typeAware: true, typeCheck: true },
     overrides: [
