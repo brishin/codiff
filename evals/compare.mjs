@@ -24,6 +24,7 @@ const comparisons = candidate.rows
     const base = baselineRows.get(row.case);
     return {
       case: row.case,
+      keyDecisionsChange: (row.keyDecisions ?? 0) - (base.keyDecisions ?? 0),
       qualityChange: row.quality - base.quality,
       speedup: base.generationMs / row.generationMs,
       stateSpeedup:
@@ -71,19 +72,24 @@ process.stdout.write(
   `- Quality: ${baseline.summary.averageQuality.toFixed(1)} -> ${candidate.summary.averageQuality.toFixed(1)} (${((qualityRatio - 1) * 100).toFixed(1)}%)\n`,
 );
 process.stdout.write(
+  `- Key decisions: ${(baseline.summary.averageKeyDecisions ?? 0).toFixed(1)} -> ${(
+    candidate.summary.averageKeyDecisions ?? 0
+  ).toFixed(1)}\n`,
+);
+process.stdout.write(
   `- Repository-state gate: ${baselineStateAvailable ? (stateGatePassed ? 'PASS' : 'FAIL') : 'N/A'}${
     baselineStateAvailable ? ` (max +${stateRegressionAllowanceMs.toFixed(1)}ms)` : ''
   }\n`,
 );
 process.stdout.write(`- 10% quality gate: ${qualityGatePassed ? 'PASS' : 'FAIL'}\n\n`);
 process.stdout.write(
-  '| Case | State speedup | Generation speedup | Quality change |\n|---|---:|---:|---:|\n',
+  '| Case | State speedup | Generation speedup | Quality change | Key decisions change |\n|---|---:|---:|---:|---:|\n',
 );
 for (const comparison of comparisons) {
   process.stdout.write(
     `| ${comparison.case} | ${
       comparison.stateSpeedup == null ? 'n/a' : `${comparison.stateSpeedup.toFixed(2)}x`
-    } | ${comparison.speedup.toFixed(2)}x | ${comparison.qualityChange >= 0 ? '+' : ''}${comparison.qualityChange.toFixed(1)} |\n`,
+    } | ${comparison.speedup.toFixed(2)}x | ${comparison.qualityChange >= 0 ? '+' : ''}${comparison.qualityChange.toFixed(1)} | ${comparison.keyDecisionsChange >= 0 ? '+' : ''}${comparison.keyDecisionsChange.toFixed(1)} |\n`,
   );
 }
 

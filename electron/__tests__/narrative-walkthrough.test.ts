@@ -362,6 +362,9 @@ test('prompts generated walkthroughs to use deterministic hunk groups', () => {
   expect(prompt).toContain('Put hunkIds in the exact display order');
   expect(prompt).toContain('automatically places every unreferenced hunk in support');
   expect(prompt).toContain('include commit.title and commit.body by default');
+  expect(prompt).toContain('Key decisions contract');
+  expect(prompt).toContain('Include at most 4 decisions');
+  expect(prompt).toContain('never invent rejected alternatives');
 });
 
 test('prompts small walkthroughs to group similar hunks into compact chapters', () => {
@@ -402,6 +405,7 @@ test('prompts small walkthroughs to group similar hunks into compact chapters', 
   expect(prompt).toContain('Use 1 story chapter');
   expect(prompt).toContain('For one- or two-file diffs, prefer one chapter');
   expect(prompt).toContain('Similar same-file hunks should usually be one stop');
+  expect(prompt).toContain('usually return an empty decisions[]');
 });
 
 test.each([
@@ -1203,6 +1207,36 @@ test('drops hunk groups that overlap already-covered hunks', () => {
 
   expect(result.chapters[0].stops.map((stop: any) => stop.id)).toEqual(['s1', 's6']);
   expect(result.support.map((item: any) => item.id)).toEqual(['lock', 'support-2']);
+});
+
+test('keeps grounded decisions linked only to surviving stops', () => {
+  const input: any = baseInput();
+  input.decisions = [
+    {
+      detail: 'Panels hide behind one toggle.',
+      stopIds: ['s6', 'stale', 's1', 's6'],
+      title: 'One toggle',
+    },
+    { detail: '', stopIds: ['s1'], title: 'No detail' },
+    { detail: 'Applies everywhere.', stopIds: [], title: 'Unlinked' },
+    ...Array.from({ length: 4 }, (_, index) => ({
+      detail: `Extra ${index}.`,
+      stopIds: ['s1'],
+      title: `Extra ${index}`,
+    })),
+  ];
+
+  const result = normalizeNarrativeWalkthrough(input, files);
+
+  expect(result.decisions.map((decision: any) => [decision.title, decision.stopIds])).toEqual([
+    ['One toggle', ['s6', 's1']],
+    ['Unlinked', []],
+    ['Extra 0', ['s1']],
+    ['Extra 1', ['s1']],
+  ]);
+  expect(
+    normalizeNarrativeWalkthrough({ ...input, decisions: [] }, files).decisions,
+  ).toBeUndefined();
 });
 
 test('adds unreferenced live hunks to support so changed code remains visible', () => {

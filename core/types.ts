@@ -592,6 +592,15 @@ export type WalkthroughCommit = {
   title?: string;
 };
 
+/** A consequential design or architectural choice the reviewer should agree with. */
+export type WalkthroughDecision = {
+  /** One or two sentences: what was chosen and the consequence or tradeoff it creates. */
+  detail: string;
+  /** Main-path stops that implement the decision, in review order. */
+  stopIds: ReadonlyArray<string>;
+  title: string;
+};
+
 export type NarrativeWalkthrough = {
   agent: 'codex' | 'claude' | 'opencode' | 'pi';
   chapters: ReadonlyArray<WalkthroughChapter>;
@@ -602,6 +611,8 @@ export type NarrativeWalkthrough = {
   commit?: WalkthroughCommit;
   /** The originating conversation, embedded for in-app Q&A. */
   context?: WalkthroughContext;
+  /** Key decisions, listed under the review focus. Omitted when there are none. */
+  decisions?: ReadonlyArray<WalkthroughDecision>;
   /** 1–2 sentence summary of the change. */
   focus: string;
   /** ISO timestamp. */
