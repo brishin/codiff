@@ -8,32 +8,51 @@ import process from 'node:process';
 import {
   listAttemptDirs,
   nowMs,
-  readCases,
   readJson,
+  readRunCases,
+  resolveCaseRepo,
   resolveRunDir,
   root,
   roundMs,
   writeJson,
 } from './lib.mjs';
 
-const [label, requestedCase] = process.argv.slice(2);
+const [label, requestedCase] = process.argv.slice(2).filter((arg) => !arg.startsWith('--'));
 if (!label) {
-  throw new Error('usage: node evals/judge.mjs <run-label> [case-id]');
+  throw new Error('usage: node evals/judge.mjs <run-label> [case-id] [--force]');
 }
 
 const runDir = resolveRunDir(label);
 const judgeSchema = await readFile(join(root, 'evals', 'judge-schema.json'), 'utf8');
-const cases = (await readCases()).filter((item) => !requestedCase || item.id === requestedCase);
+const cases = (await readRunCases(runDir)).filter(
+  (item) => !requestedCase || item.id === requestedCase,
+);
 
 const runJudge = async (evalCase, attemptDir) => {
   const walkthrough = await readFile(join(attemptDir, 'walkthrough.json'), 'utf8');
-  const prompt = `You are judging the quality of a Codiff narrative code walkthrough for commit ${evalCase.commit}.
+  const description = await readFile(join(attemptDir, 'source-description.txt'), 'utf8').catch(
+    () => '',
+  );
+  const target =
+    evalCase.pr != null
+      ? `pull request #${evalCase.pr}, whose squashed diff is commit ${evalCase.commit}`
+      : `commit ${evalCase.commit}`;
+  const descriptionInput = description
+    ? `
+The walkthrough author also saw this pull request description. Treat it as author intent, not proof of behavior:
+<description>
+${description}
+</description>
+`
+    : '';
+  const prompt = `You are judging the quality of a Codiff narrative code walkthrough for ${target}.
 
-Inspect the commit directly with read-only git commands. Judge the candidate as a reviewer-facing path through the change, not as a generic summary. Hunk IDs are deterministic anchors; verify the prose and ordering against the actual diff. Do not reward verbosity.
+Inspect commit ${evalCase.commit} directly with read-only git commands. Judge the candidate as a reviewer-facing path through the change, not as a generic summary. Hunk IDs are deterministic anchors; verify the prose and ordering against the actual diff. Do not reward verbosity.
 
 Case rubric:
 ${evalCase.rubric.map((item) => `- ${item}`).join('\n')}
 
+${descriptionInput}
 Candidate walkthrough:
 ${walkthrough}
 
@@ -43,6 +62,8 @@ Scoring:
 - organization (0-20): coherent conceptual chapters, sensible grouping, concise reviewer path.
 - specificity (0-15): prose names concrete symbols, contracts, and interactions rather than generic file summaries.
 - total must equal the four component scores.
+- keyDecisions (0-10, separate from total): can a reviewer quickly identify the change's consequential design or architectural choices (boundaries, data flow, contracts, security or compatibility strategy, deliberate tradeoffs), through decisions[] when present or otherwise through focus and prose? Reward grounded, specific choices and their consequences. Penalize invented rationale or alternatives, trivia presented as decisions, and missing major choices. For a mechanical or single-behavior change, 10 means it correctly surfaces no or almost no decisions.
+- keyDecisionNotes: one or two sentences explaining the keyDecisions score.
 
 Be strict and consistent. Put material factual or coverage failures in majorErrors.`;
 
@@ -71,7 +92,7 @@ Be strict and consistent. Put material factual or coverage failures in majorErro
           '--output-last-message',
           outputPath,
           '--cd',
-          root,
+          resolveCaseRepo(evalCase),
         ],
         { stdio: ['pipe', 'pipe', 'pipe'] },
       );
@@ -98,7 +119,9 @@ Be strict and consistent. Put material factual or coverage failures in majorErro
       wallMs: roundMs(nowMs() - started),
     });
     process.stdout.write(
-      `${evalCase.id}/${basename(attemptDir)}: ${judge?.total ?? 'failed'}/100\n`,
+      `${evalCase.id}/${basename(attemptDir)}: ${judge?.total ?? 'failed'}/100, decisions ${
+        judge?.keyDecisions ?? 'n/a'
+      }/10\n`,
     );
   } finally {
     await rm(temporaryDir, { force: true, recursive: true });
@@ -107,7 +130,9 @@ Be strict and consistent. Put material factual or coverage failures in majorErro
 
 for (const evalCase of cases) {
   for (const attemptDir of await listAttemptDirs(runDir, evalCase.id)) {
-    if (await readJson(join(attemptDir, 'walkthrough.json'))) {
+    const judged =
+      !process.argv.includes('--force') && (await readJson(join(attemptDir, 'judge.json')));
+    if (!judged && (await readJson(join(attemptDir, 'walkthrough.json')))) {
       await runJudge(evalCase, attemptDir);
     }
   }

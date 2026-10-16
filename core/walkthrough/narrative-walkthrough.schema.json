@@ -107,6 +107,31 @@
       "maxItems": 6,
       "type": "array"
     },
+    "decisions": {
+      "description": "Consequential design or architectural choices a reviewer must agree with, each linked to the main-path stops that implement it.",
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "type": "string"
+          },
+          "stopIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": {
+            "maxLength": 80,
+            "type": "string"
+          }
+        },
+        "required": ["title", "detail", "stopIds"],
+        "type": "object"
+      },
+      "maxItems": 4,
+      "type": "array"
+    },
     "focus": {
       "type": "string"
     },

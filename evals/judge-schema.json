@@ -28,6 +28,14 @@
       "minimum": 0,
       "maximum": 100
     },
+    "keyDecisions": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10
+    },
+    "keyDecisionNotes": {
+      "type": "string"
+    },
     "explanation": {
       "type": "string"
     },
@@ -44,6 +52,8 @@
     "organization",
     "specificity",
     "total",
+    "keyDecisions",
+    "keyDecisionNotes",
     "explanation",
     "majorErrors"
   ]
