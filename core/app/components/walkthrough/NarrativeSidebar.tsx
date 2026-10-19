@@ -9,6 +9,7 @@ import {
   getUncoveredWalkthroughFileLineItems,
   isWalkthroughCommittable,
   walkthroughItemTitleFallback,
+  type WalkthroughDecisionView,
   type WalkthroughView,
   type WalkthroughStopView,
 } from '../../../lib/narrative-walkthrough.ts';
@@ -41,6 +42,56 @@ function TocFileRows({
         </span>
       ))}
     </span>
+  );
+}
+
+function KeyDecisions({
+  decisions,
+  onSelect,
+}: {
+  decisions: ReadonlyArray<WalkthroughDecisionView>;
+  onSelect: (index: number) => void;
+}) {
+  if (decisions.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="wt-decisions">
+      <span className="wt-focus-label">Key decisions</span>
+      <ol className="wt-decision-list">
+        {decisions.map((decision, decisionIndex) => {
+          const [firstStopIndex] = decision.stopIndexes;
+          const content = (
+            <>
+              <span className="wt-decision-title">{decision.title}</span>
+              <span className="wt-decision-detail">{renderInlineMarkdown(decision.detail)}</span>
+              {decision.stopIndexes.length > 0 ? (
+                <span className="wt-decision-stops">
+                  {decision.stopIndexes.length === 1 ? 'Stop' : 'Stops'}{' '}
+                  {decision.stopIndexes.map((index) => index + 1).join(', ')}
+                </span>
+              ) : null}
+            </>
+          );
+          return (
+            <li key={`${decisionIndex}:${decision.title}`}>
+              {firstStopIndex == null ? (
+                <div className="wt-decision">{content}</div>
+              ) : (
+                <button
+                  className="wt-decision"
+                  onClick={() => onSelect(firstStopIndex)}
+                  type="button"
+                >
+                  {content}
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }
 
@@ -188,6 +239,7 @@ export function NarrativeSidebar({
       </div>
 
       <div className="wt-toc-scroll">
+        <KeyDecisions decisions={walkthroughView.decisions} onSelect={navigation.goStop} />
         {walkthroughView.chapters.map((chapter) => (
           <div className="wt-toc-chapter" key={chapter.id}>
             <div className="wt-toc-chapter-head">
