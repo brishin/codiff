@@ -19,6 +19,6 @@
     "target": "es2017",
     "types": ["vite-plus/client"]
   },
-  "exclude": ["core/node_modules", "dist", "node_modules", "out"],
+  "exclude": ["core/node_modules", "dist", "node_modules", "out", "plugins/claude"],
   "include": ["web/.fate/*.ts", "**/*.cjs", "**/*.ts", "**/*.tsx"]
 }

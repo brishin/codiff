@@ -1,0 +1,13 @@
+{
+  "name": "codiff-local",
+  "description": "Claude Code plugins for Codiff, installed from this checkout.",
+  "owner": {
+    "name": "Brian Shin"
+  },
+  "plugins": [
+    {
+      "name": "codiff-pane",
+      "source": "./codiff-pane"
+    }
+  ]
+}

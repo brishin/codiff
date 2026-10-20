@@ -10,7 +10,8 @@ import '../../core/App.css';
 type Review = {
   comparison: string;
   snapshot: SharedWalkthroughSnapshot;
-  threadId: string;
+  // Null when the host supplied `cwd` instead of a Codex thread.
+  threadId: string | null;
   threadTitle: string;
 };
 type RpcResponse = {
@@ -83,12 +84,20 @@ function ThreadReview() {
   >('idle');
   const [walkthroughError, setWalkthroughError] = useState('');
   const revision = useRef(0);
+  const checkout = useRef<{ cwd?: string }>({});
+  useEffect(() => {
+    checkout.current =
+      review && review.threadId === null ? { cwd: review.snapshot.repository.root } : {};
+  }, [review]);
   const refresh = useCallback(async () => {
     const requestRevision = ++revision.current;
     setLoading(true);
     setError('');
     try {
-      const result = await rpc('tools/call', { arguments: {}, name: 'review_refresh' });
+      const result = await rpc('tools/call', {
+        arguments: checkout.current,
+        name: 'review_refresh',
+      });
       const value = getReview(result);
       if (!value) {
         throw new Error(
@@ -115,7 +124,7 @@ function ThreadReview() {
     try {
       const result = await rpc(
         'tools/call',
-        { arguments: {}, name: 'review_walkthrough' },
+        { arguments: checkout.current, name: 'review_walkthrough' },
         20 * 60_000,
       );
       if (revision.current !== requestRevision) {

@@ -90,12 +90,8 @@ const {
   validateWindowStateOnScreen,
   writeWindowState,
 } = require('./window-state.cjs');
-const {
-  getNarrativeWalkthroughCacheKey,
-  normalizeNarrativeWalkthrough,
-  readNarrativeWalkthrough,
-} = require('./narrative-walkthrough.cjs');
-const { readStoredWalkthrough, writeStoredWalkthrough } = require('./walkthrough-store.cjs');
+const { readCachedNarrativeWalkthrough } = require('./cached-narrative-walkthrough.cjs');
+const { normalizeNarrativeWalkthrough } = require('./narrative-walkthrough.cjs');
 const { uploadSharedSnapshot } = require('./shared-walkthrough-upload.cjs');
 const {
   resolvePlanShareTarget,
@@ -619,6 +615,23 @@ const buildReasoningEffortSubmenu = () => {
   }));
 };
 
+/** @returns {Array<import('electron').MenuItemConstructorOptions>} */
+const buildCodexMenuItems = () =>
+  getActiveAgent().id === 'codex'
+    ? [
+        { label: 'Reasoning Effort', submenu: buildReasoningEffortSubmenu() },
+        {
+          checked: config.settings.openAIFastMode,
+          click: () =>
+            updateConfig({
+              settings: { ...config.settings, openAIFastMode: !config.settings.openAIFastMode },
+            }),
+          label: 'Fast Mode',
+          type: 'checkbox',
+        },
+      ]
+    : [];
+
 const getInstallSkillMenuItem = () =>
   buildInstallSkillMenuItem(
     (skill, browserWindow) => void skillInstallers.get(skill.id)?.install(browserWindow),
@@ -676,9 +689,7 @@ const buildApplicationMenu = () =>
                   label: 'Model',
                   submenu: buildModelSubmenu(),
                 },
-                ...(getActiveAgent().id === 'codex'
-                  ? [{ label: 'Reasoning Effort', submenu: buildReasoningEffortSubmenu() }]
-                  : []),
+                ...buildCodexMenuItems(),
                 { type: 'separator' },
                 {
                   click: () => {
@@ -719,9 +730,7 @@ const buildApplicationMenu = () =>
                   label: 'Model',
                   submenu: buildModelSubmenu(),
                 },
-                ...(getActiveAgent().id === 'codex'
-                  ? [{ label: 'Reasoning Effort', submenu: buildReasoningEffortSubmenu() }]
-                  : []),
+                ...buildCodexMenuItems(),
                 { type: 'separator' },
                 {
                   click: () => {
@@ -1753,72 +1762,14 @@ ipcMain.handle('codiff:getNarrativeWalkthrough', async (event, source, options) 
       launchOptions?.walkthroughContext,
       await agent.readSessionContext(launchOptions?.[agent.sessionLaunchOptionKey]),
     );
-    const agentOptions = getAgentOptions(agent);
-    const walkthroughModel = agent.normalizeModel(agentOptions.model);
-    const walkthroughPrompt = config.settings.walkthroughPrompt;
-    const cacheKey = getNarrativeWalkthroughCacheKey(
+    return await readCachedNarrativeWalkthrough(
       state,
       agent,
-      walkthroughModel,
+      { ...getAgentOptions(agent), onProgress: reportProgress },
       walkthroughContext,
-      walkthroughPrompt,
-      agentOptions.reasoningEffort,
+      config.settings.walkthroughPrompt,
+      { force: options?.force, previousWalkthrough: options?.previousWalkthrough },
     );
-    if (!options?.force) {
-      const cachedWalkthrough = readStoredWalkthrough(cacheKey);
-      if (cachedWalkthrough) {
-        return {
-          status: 'ready',
-          walkthrough: {
-            ...cachedWalkthrough,
-            ...(walkthroughContext ? { context: walkthroughContext } : {}),
-            agent: agent.id,
-            repo: {
-              branch: state.branch,
-              root: state.root,
-            },
-            source: state.source,
-          },
-        };
-      }
-    }
-
-    let generatedModel = walkthroughModel;
-    const onModelFallback = agentOptions.onModelFallback;
-    const result = await readNarrativeWalkthrough(
-      state,
-      agent,
-      {
-        ...agentOptions,
-        model: walkthroughModel,
-        onModelFallback: async (fallbackModel, originalModel) => {
-          generatedModel = fallbackModel;
-          await onModelFallback(fallbackModel, originalModel);
-        },
-        onProgress: reportProgress,
-      },
-      walkthroughContext,
-      walkthroughPrompt,
-      options?.previousWalkthrough,
-    );
-    if (result.status === 'ready') {
-      const generatedCacheKey = getNarrativeWalkthroughCacheKey(
-        state,
-        agent,
-        generatedModel,
-        walkthroughContext,
-        walkthroughPrompt,
-        agentOptions.reasoningEffort,
-      );
-      try {
-        const cacheableWalkthrough = { ...result.walkthrough };
-        delete cacheableWalkthrough.context;
-        writeStoredWalkthrough(generatedCacheKey, cacheableWalkthrough);
-      } catch {
-        // Caching is optional; a filesystem failure must not hide a generated result.
-      }
-    }
-    return result;
   } catch (error) {
     return {
       reason: error instanceof Error ? error.message : String(error),

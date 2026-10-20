@@ -46,6 +46,10 @@ A separate local `codex app-server` connection calls read-only `thread/read` to
 resolve the checkout. This lookup never resumes the chat or starts a model turn.
 The existing Codiff Git reader supplies eager file contents to the viewer.
 
+Hosts without Codex thread metadata can pass an absolute `cwd` to `review_thread`
+instead. The thread lookup is skipped, and the viewer passes the same `cwd` back
+when it refreshes or generates a walkthrough.
+
 The server loads its HTML resources and bundled backends at startup. Running
 connections can still serve the viewer when an update removes their old plugin
 cache directory. The tool timeout allows 20 minutes for generation, including

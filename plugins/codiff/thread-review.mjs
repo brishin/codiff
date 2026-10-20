@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { homedir } from 'node:os';
-import { isAbsolute, join } from 'node:path';
+import { basename, isAbsolute, join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { clearTimeout, setTimeout } from 'node:timers';
 import { defaultReviewPreferences } from '../../core/defaults.ts';
@@ -129,10 +129,22 @@ export const generateThreadWalkthrough = async (
   return result.walkthrough;
 };
 
-export const loadThreadReview = async (meta, { generateWalkthrough = false } = {}) => {
+// Hosts without Codex thread metadata pass the checkout path directly.
+export const resolveCheckout = async (meta, cwd, read = readThread) => {
+  if (cwd !== undefined) {
+    if (typeof cwd !== 'string' || !isAbsolute(cwd)) {
+      throw new Error('`cwd` must be an absolute path to a local checkout.');
+    }
+    return { cwd, name: basename(cwd), threadId: null };
+  }
   const threadId = getThreadId(meta);
-  const thread = await readThread(threadId);
-  const state = await workingTree.readWorkingTreeState(thread.cwd, { eagerContents: true });
+  const thread = await read(threadId);
+  return { cwd: thread.cwd, name: thread.name, threadId };
+};
+
+export const loadThreadReview = async (meta, { cwd, generateWalkthrough = false } = {}) => {
+  const checkout = await resolveCheckout(meta, cwd);
+  const state = await workingTree.readWorkingTreeState(checkout.cwd, { eagerContents: true });
   const branch =
     (await common.gitOrEmpty(state.root, ['symbolic-ref', '--short', 'HEAD'])).trim() || null;
   const exportedAt = new Date().toISOString();
@@ -165,7 +177,7 @@ export const loadThreadReview = async (meta, { generateWalkthrough = false } = {
         version: 4,
       },
     },
-    threadId,
-    threadTitle: thread.name || 'Thread changes',
+    threadId: checkout.threadId,
+    threadTitle: checkout.name || 'Thread changes',
   };
 };
