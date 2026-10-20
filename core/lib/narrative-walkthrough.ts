@@ -4,6 +4,7 @@ import type {
   NarrativeWalkthrough,
   WalkthroughChangeType,
   WalkthroughChapter,
+  WalkthroughDecision,
   WalkthroughHunk,
   WalkthroughHunkGroup,
   WalkthroughIcon,
@@ -35,6 +36,11 @@ type WalkthroughChapterView = Omit<WalkthroughChapter, 'stops'> & {
   stops: ReadonlyArray<WalkthroughStopView>;
 };
 
+/** A key decision with the global indexes of the stops that implement it. */
+export type WalkthroughDecisionView = WalkthroughDecision & {
+  stopIndexes: ReadonlyArray<number>;
+};
+
 /** Support grouped by reason, preserving first-seen order. */
 type WalkthroughSupportReason = {
   files: ReadonlyArray<WalkthroughSupportGroup>;
@@ -44,6 +50,7 @@ type WalkthroughSupportReason = {
 /** Everything a narrative walkthrough needs to render. */
 export type WalkthroughView = {
   chapters: ReadonlyArray<WalkthroughChapterView>;
+  decisions: ReadonlyArray<WalkthroughDecisionView>;
   sequence: ReadonlyArray<WalkthroughStopView>;
   support: ReadonlyArray<WalkthroughSupportGroup>;
   supportByReason: ReadonlyArray<WalkthroughSupportReason>;
@@ -339,8 +346,20 @@ export const buildWalkthroughView = (walkthrough: NarrativeWalkthrough): Walkthr
     return null;
   }
 
+  const stopIndexById = new Map(sequence.map((stop) => [stop.id, stop.index]));
+  const decisions = (walkthrough.decisions ?? []).map((decision) => ({
+    ...decision,
+    stopIndexes: decision.stopIds
+      .flatMap((id) => {
+        const index = stopIndexById.get(id);
+        return index == null ? [] : [index];
+      })
+      .sort((left, right) => left - right),
+  }));
+
   return {
     chapters,
+    decisions,
     sequence,
     support: walkthrough.support,
     supportByReason: groupSupportByReason(walkthrough.support),

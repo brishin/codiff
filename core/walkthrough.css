@@ -20,6 +20,56 @@
   text-wrap: pretty;
 }
 
+.wt-decisions {
+  border-bottom: 1px solid var(--sidebar-border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 0 8px;
+}
+.wt-decisions .wt-focus-label {
+  padding: 0 2px;
+}
+.wt-decision-list {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.wt-decision {
+  background: none;
+  border: 0;
+  border-radius: 12px;
+  color: inherit;
+  corner-shape: squircle;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  text-align: start;
+  width: 100%;
+}
+button.wt-decision {
+  cursor: pointer;
+}
+button.wt-decision:hover {
+  background: var(--hover-wash);
+}
+.wt-decision-title {
+  color: var(--text);
+  font: 600 12px/1.35 var(--font-sans);
+}
+.wt-decision-detail {
+  color: var(--sidebar-text);
+  font: 12px/1.45 var(--font-sans);
+  text-wrap: pretty;
+}
+.wt-decision-stops {
+  color: var(--muted);
+  font: 600 11px/1.35 var(--font-sans);
+}
+
 .wt-toc-scroll {
   --wt-toc-node-bg: color-mix(in srgb, var(--sidebar-text) 6%, transparent);
   --wt-toc-node-size: 13px;

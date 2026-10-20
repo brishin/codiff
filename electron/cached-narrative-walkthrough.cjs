@@ -3,7 +3,6 @@
 const {
   getNarrativeWalkthroughCacheKey,
   readNarrativeWalkthrough,
-  resolveNarrativeWalkthroughModel,
 } = require('./narrative-walkthrough.cjs');
 const { readStoredWalkthrough, writeStoredWalkthrough } = require('./walkthrough-store.cjs');
 
@@ -38,12 +37,7 @@ const readCachedNarrativeWalkthrough = async (
   customPrompt,
   options = {},
 ) => {
-  const model = resolveNarrativeWalkthroughModel(
-    state,
-    agent,
-    agentOptions.model,
-    agentOptions.reasoningEffort,
-  );
+  const model = agent.normalizeModel(agentOptions.model);
   const cacheKeyFor = (/** @type {unknown} */ keyModel) =>
     getNarrativeWalkthroughCacheKey(
       state,

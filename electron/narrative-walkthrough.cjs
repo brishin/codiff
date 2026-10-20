@@ -17,6 +17,7 @@ const {
   IMPORTANCES,
   MAX_HUNKS_PER_WALKTHROUGH_GROUP,
   MAX_WALKTHROUGH_CHAPTERS,
+  MAX_WALKTHROUGH_DECISIONS,
   MAX_WALKTHROUGH_STOPS,
   narrativeWalkthroughResponseSchema,
   narrativeWalkthroughSchema,
@@ -54,7 +55,6 @@ const INCLUDED_WALKTHROUGH_FILES = 8;
 const INCLUDED_WALKTHROUGH_HUNKS = 12;
 const TIMEOUT_MS_PER_EXTRA_FILE = 1_000;
 const TIMEOUT_MS_PER_EXTRA_HUNK = 2_000;
-const LARGE_WALKTHROUGH_HUNK_THRESHOLD = 100;
 const WALKTHROUGH_CACHE_KEY_VERSION = 1;
 
 /** @param {unknown} value @param {string} [fallback] */
@@ -362,6 +362,41 @@ const normalizeChapters = (input, index, coveredHunkIds) => {
   return { chapters, itemIds, stopCount };
 };
 
+/**
+ * Keep decisions that name a choice and explain it, linked only to stops that
+ * survived normalization.
+ * @param {unknown} input
+ * @param {ReadonlyArray<{stops: ReadonlyArray<{id: string}>}>} chapters
+ */
+const normalizeDecisions = (input, chapters) => {
+  const stopIds = new Set(chapters.flatMap((chapter) => chapter.stops.map((stop) => stop.id)));
+  const decisions = [];
+  for (const decision of Array.isArray(input) ? input : []) {
+    if (decisions.length >= MAX_WALKTHROUGH_DECISIONS) {
+      break;
+    }
+
+    const title = cleanText(decision?.title);
+    const detail = cleanText(decision?.detail);
+    if (!title || !detail) {
+      continue;
+    }
+
+    decisions.push({
+      detail,
+      stopIds: [
+        ...new Set(
+          (Array.isArray(decision?.stopIds) ? decision.stopIds : [])
+            .map((id) => oneLine(id))
+            .filter((id) => stopIds.has(id)),
+        ),
+      ],
+      title,
+    });
+  }
+  return decisions;
+};
+
 const normalizeAuthoredSupport = (input, index, coveredHunkIds, itemIds) => {
   const support = [];
   const seenSupportHunkGroups = new Set();
@@ -478,6 +513,11 @@ const normalizeNarrativeWalkthrough = (input, files, facts = {}, hunkIdByAlias =
     title: cleanText(input.title, 'Walkthrough'),
     version: 4,
   };
+
+  const decisions = normalizeDecisions(input.decisions, chapters);
+  if (decisions.length > 0) {
+    result.decisions = decisions;
+  }
 
   result.meta = `${stopCount} stops · ${chapters.length} chapters`;
   if (facts.context && typeof facts.context === 'object') {
@@ -709,9 +749,28 @@ const buildPreviousWalkthroughInput = (previousWalkthrough) => {
           title: oneLine(walkthrough.commit.title),
         }
       : undefined;
+  // Stop ids do not survive regeneration, so link previous decisions by stop title.
+  const stopTitleById = new Map(
+    (Array.isArray(walkthrough.chapters) ? walkthrough.chapters : []).flatMap((chapter) =>
+      (Array.isArray(chapter?.stops) ? chapter.stops : []).map((stop) => [
+        stop?.id,
+        oneLine(stop?.title),
+      ]),
+    ),
+  );
+  const decisions = (Array.isArray(walkthrough.decisions) ? walkthrough.decisions : [])
+    .map((decision) => ({
+      detail: oneLine(decision?.detail),
+      stops: (Array.isArray(decision?.stopIds) ? decision.stopIds : [])
+        .map((id) => stopTitleById.get(id))
+        .filter(Boolean),
+      title: oneLine(decision?.title),
+    }))
+    .filter((decision) => decision.title);
   const summary = {
     chapters,
     ...(commit?.body || commit?.title ? { commit } : {}),
+    ...(decisions.length > 0 ? { decisions } : {}),
     focus: oneLine(walkthrough.focus),
     title: oneLine(walkthrough.title),
   };
@@ -736,25 +795,6 @@ const getWalkthroughSize = (state) => ({
     0,
   ),
 });
-
-/**
- * Use the compatibility model for large default-Codex walkthroughs. Explicit
- * model or effort selections and non-Codex backends keep their configured model.
- *
- * @param {RepositoryState} state
- * @param {Agent} agent
- * @param {unknown} model
- * @param {string} [reasoningEffort]
- */
-const resolveNarrativeWalkthroughModel = (state, agent, model, reasoningEffort) => {
-  const normalizedModel = agent.normalizeModel(model);
-  return agent.id === 'codex' &&
-    normalizedModel === agent.defaultModel &&
-    !reasoningEffort?.trim() &&
-    getWalkthroughSize(state).hunkCount >= LARGE_WALKTHROUGH_HUNK_THRESHOLD
-    ? agent.fallbackModel
-    : normalizedModel;
-};
 
 /**
  * Small walkthroughs retain the normal agent timeout. Larger digests get more
@@ -820,6 +860,25 @@ Grouping contract:
 `;
 };
 
+/** @param {RepositoryState} state */
+const buildDecisionGuidance = (state) => {
+  const { fileCount, hunkCount } = getWalkthroughSize(state);
+  const decisionInstruction =
+    hunkCount <= 4
+      ? 'For a diff this small, usually return an empty decisions[]; include at most 1 decision'
+      : hunkCount <= 12 || (fileCount <= 4 && hunkCount <= 16)
+        ? 'Include at most 2 decisions'
+        : `Include at most ${MAX_WALKTHROUGH_DECISIONS} decisions`;
+  return `Key decisions contract:
+- decisions[] lists the consequential design or architectural choices a reviewer must agree with before approving: a new module boundary or ownership move; a data-flow, storage, caching, or query strategy; a public contract change (API, URL, schema, config, CLI); a security or privacy boundary; a compatibility or migration strategy; or a deliberate tradeoff.
+- ${decisionInstruction}; this is a ceiling, not a target. Return an empty decisions[] for mechanical, docs-only, rename, or single-behavior fixes.
+- Each title names the choice itself in roughly 3-8 words, e.g. "Validate tokens at the gateway" or "Cache sessions per tenant". Never use a filename, a stop title, or a generic label like "Refactor".
+- Each detail is 1-2 sentences: what was chosen and the consequence, invariant, or tradeoff it creates for the system. Give a reason only when source.description, the conversation context, or the code itself states it; never invent rejected alternatives, benchmarks, motives, or risks.
+- stopIds lists the main-path stop ids from chapters[] that implement the decision, in review order. Prefer decisions that the main path covers.
+- Decisions summarize choices across the change; do not restate each stop. Leave renames, routine refactors, styling, tests, and wiring out of decisions[].
+`;
+};
+
 const buildNarrativeWalkthroughRequest = (
   state,
   context,
@@ -836,6 +895,7 @@ Return JSON only. Do not inspect the repository or run shell commands; use only 
 If source.description is present, treat it as author-written PR/MR intent and orientation, not proof of behavior. The changed files, patches, and hunk data remain the source of truth for what changed.
 
 ${buildWalkthroughSizingGuidance(state)}
+${buildDecisionGuidance(state)}
 
 ${buildWalkthroughContextInput(context, agentLabel)}
 ${buildCustomPromptInput(customPrompt)}
@@ -978,5 +1038,4 @@ module.exports = {
   narrativeWalkthroughSchema,
   normalizeNarrativeWalkthrough,
   readNarrativeWalkthrough,
-  resolveNarrativeWalkthroughModel,
 };

@@ -9,7 +9,6 @@ const {
   narrativeWalkthroughSchema,
   normalizeNarrativeWalkthrough,
   readNarrativeWalkthrough,
-  resolveNarrativeWalkthroughModel,
 } = require('../narrative-walkthrough.cjs') as {
   buildNarrativeWalkthroughPrompt: (
     state: any,
@@ -49,12 +48,6 @@ const {
     customPrompt?: string,
     previousWalkthrough?: unknown,
   ) => Promise<any>;
-  resolveNarrativeWalkthroughModel: (
-    state: any,
-    agent: any,
-    model: unknown,
-    reasoningEffort?: string,
-  ) => string;
 };
 
 const addedPatch = (count: number) =>
@@ -362,6 +355,9 @@ test('prompts generated walkthroughs to use deterministic hunk groups', () => {
   expect(prompt).toContain('Put hunkIds in the exact display order');
   expect(prompt).toContain('automatically places every unreferenced hunk in support');
   expect(prompt).toContain('include commit.title and commit.body by default');
+  expect(prompt).toContain('Key decisions contract');
+  expect(prompt).toContain('Include at most 4 decisions');
+  expect(prompt).toContain('never invent rejected alternatives');
 });
 
 test('prompts small walkthroughs to group similar hunks into compact chapters', () => {
@@ -402,6 +398,7 @@ test('prompts small walkthroughs to group similar hunks into compact chapters', 
   expect(prompt).toContain('Use 1 story chapter');
   expect(prompt).toContain('For one- or two-file diffs, prefer one chapter');
   expect(prompt).toContain('Similar same-file hunks should usually be one stop');
+  expect(prompt).toContain('usually return an empty decisions[]');
 });
 
 test.each([
@@ -446,57 +443,6 @@ test.each([
     expect(prompt).toContain(chapters);
   },
 );
-
-test('uses GPT-5.5 for large walkthroughs only with automatic effort on the default model', () => {
-  const createState = (hunkCount: number) => ({
-    branch: 'main',
-    files: [
-      {
-        path: 'large.ts',
-        sections: [
-          {
-            id: 'large.ts:staged',
-            kind: 'staged',
-            patch: Array.from(
-              { length: hunkCount },
-              (_, index) => `@@ -${index + 1} +${index + 1} @@\n-old ${index}\n+new ${index}\n`,
-            ).join(''),
-          },
-        ],
-        status: 'modified',
-      },
-    ],
-    generatedAt: 1,
-    root: '/repo',
-    source: { type: 'working-tree' },
-  });
-  const codexAgent = {
-    defaultModel: 'gpt-5.6-terra',
-    fallbackModel: 'gpt-5.5',
-    id: 'codex',
-    normalizeModel: (model: unknown) => String(model),
-  };
-
-  expect(resolveNarrativeWalkthroughModel(createState(99), codexAgent, 'gpt-5.6-terra')).toBe(
-    'gpt-5.6-terra',
-  );
-  expect(resolveNarrativeWalkthroughModel(createState(100), codexAgent, 'gpt-5.6-terra')).toBe(
-    'gpt-5.5',
-  );
-  expect(
-    resolveNarrativeWalkthroughModel(createState(100), codexAgent, 'gpt-5.6-terra', 'max'),
-  ).toBe('gpt-5.6-terra');
-  expect(resolveNarrativeWalkthroughModel(createState(100), codexAgent, 'gpt-5.6-sol')).toBe(
-    'gpt-5.6-sol',
-  );
-  expect(
-    resolveNarrativeWalkthroughModel(
-      createState(100),
-      { ...codexAgent, id: 'claude' },
-      'claude-sonnet',
-    ),
-  ).toBe('claude-sonnet');
-});
 
 test('prompts generated walkthroughs with custom user guidance without replacing core constraints', () => {
   const prompt = buildNarrativeWalkthroughPrompt(
@@ -1203,6 +1149,36 @@ test('drops hunk groups that overlap already-covered hunks', () => {
 
   expect(result.chapters[0].stops.map((stop: any) => stop.id)).toEqual(['s1', 's6']);
   expect(result.support.map((item: any) => item.id)).toEqual(['lock', 'support-2']);
+});
+
+test('keeps grounded decisions linked only to surviving stops', () => {
+  const input: any = baseInput();
+  input.decisions = [
+    {
+      detail: 'Panels hide behind one toggle.',
+      stopIds: ['s6', 'stale', 's1', 's6'],
+      title: 'One toggle',
+    },
+    { detail: '', stopIds: ['s1'], title: 'No detail' },
+    { detail: 'Applies everywhere.', stopIds: [], title: 'Unlinked' },
+    ...Array.from({ length: 4 }, (_, index) => ({
+      detail: `Extra ${index}.`,
+      stopIds: ['s1'],
+      title: `Extra ${index}`,
+    })),
+  ];
+
+  const result = normalizeNarrativeWalkthrough(input, files);
+
+  expect(result.decisions.map((decision: any) => [decision.title, decision.stopIds])).toEqual([
+    ['One toggle', ['s6', 's1']],
+    ['Unlinked', []],
+    ['Extra 0', ['s1']],
+    ['Extra 1', ['s1']],
+  ]);
+  expect(
+    normalizeNarrativeWalkthrough({ ...input, decisions: [] }, files).decisions,
+  ).toBeUndefined();
 });
 
 test('adds unreferenced live hunks to support so changed code remains visible', () => {
