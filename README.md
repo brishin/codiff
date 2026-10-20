@@ -145,7 +145,7 @@ counts; when it is `false`, Codiff hides those changes from the working-tree rev
     "diffStyle": "split",
     "editorCommand": "",
     "lastRepositoryPath": "",
-    "openAIModel": "gpt-5.6-terra",
+    "openAIModel": "gpt-6-luna",
     "openAIReasoningEffort": "",
     "opencodeModel": "opencode-default",
     "sidebarPosition": "left",
@@ -223,12 +223,10 @@ An explicit effort also applies to a fallback model; clear it to use that model'
 Walkthrough caches distinguish explicit reasoning efforts, so a new generation request with a
 different effort does not reuse the previous effort's result.
 
-Codex walkthroughs still default to GPT-5.6 Terra with low reasoning. GPT-5.6 Sol and Luna use
-medium reasoning unless you override it. If a selected model is unavailable, Codiff retries with
-Terra when applicable and then GPT-5.5, persisting the first model that succeeds unless you changed
-the selection during the run. Walkthroughs with at least 100 reviewable hunks use GPT-5.5 with low
-reasoning when Terra is the configured default and no explicit effort is configured. An explicit
-effort keeps the selected model for these large walkthroughs.
+Codex walkthroughs default to GPT-6 Luna with high reasoning. GPT-6 Astra and Sol use low
+reasoning unless you override it, and GPT-6.1 Sol inherits your Codex settings. GPT-5.6 models remain
+configurable by ID. If a selected model is unavailable, Codiff retries with Luna when applicable and then GPT-5.5,
+persisting the first model that succeeds unless you changed the selection during the run.
 
 Install the backend you want and verify it is available before using `codiff -w`:
 

@@ -55,7 +55,6 @@ const INCLUDED_WALKTHROUGH_FILES = 8;
 const INCLUDED_WALKTHROUGH_HUNKS = 12;
 const TIMEOUT_MS_PER_EXTRA_FILE = 1_000;
 const TIMEOUT_MS_PER_EXTRA_HUNK = 2_000;
-const LARGE_WALKTHROUGH_HUNK_THRESHOLD = 100;
 const WALKTHROUGH_CACHE_KEY_VERSION = 1;
 
 /** @param {unknown} value @param {string} [fallback] */
@@ -798,25 +797,6 @@ const getWalkthroughSize = (state) => ({
 });
 
 /**
- * Use the compatibility model for large default-Codex walkthroughs. Explicit
- * model or effort selections and non-Codex backends keep their configured model.
- *
- * @param {RepositoryState} state
- * @param {Agent} agent
- * @param {unknown} model
- * @param {string} [reasoningEffort]
- */
-const resolveNarrativeWalkthroughModel = (state, agent, model, reasoningEffort) => {
-  const normalizedModel = agent.normalizeModel(model);
-  return agent.id === 'codex' &&
-    normalizedModel === agent.defaultModel &&
-    !reasoningEffort?.trim() &&
-    getWalkthroughSize(state).hunkCount >= LARGE_WALKTHROUGH_HUNK_THRESHOLD
-    ? agent.fallbackModel
-    : normalizedModel;
-};
-
-/**
  * Small walkthroughs retain the normal agent timeout. Larger digests get more
  * time for hunk classification and structured output, capped at five minutes.
  *
@@ -1058,5 +1038,4 @@ module.exports = {
   narrativeWalkthroughSchema,
   normalizeNarrativeWalkthrough,
   readNarrativeWalkthrough,
-  resolveNarrativeWalkthroughModel,
 };

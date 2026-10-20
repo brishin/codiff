@@ -15,9 +15,10 @@ const {
 } = require('./agent-shared.cjs');
 
 const CODEX_TIMEOUT_MS = 90_000;
-const DEFAULT_OPENAI_MODEL = 'gpt-5.6-terra';
+const DEFAULT_OPENAI_MODEL = 'gpt-6-luna';
 const FALLBACK_OPENAI_MODEL = 'gpt-5.5';
 const CODEX_REASONING_EFFORT = 'low';
+const DEFAULT_OPENAI_REASONING_EFFORT = 'high';
 const CODEX_MACOS_BLOCKED_MESSAGE =
   'macOS blocked the local Codex CLI. Update Codex CLI from the official OpenAI release, then run `codex --version` and try again.';
 const CODEX_NOT_FOUND_CODE = 'CODEX_NOT_FOUND';
@@ -56,15 +57,15 @@ const CODEX_NOT_FOUND_MESSAGE =
 const OPENAI_MODELS = Object.freeze([
   {
     id: DEFAULT_OPENAI_MODEL,
-    label: 'Default: GPT-5.6 Terra',
+    label: 'Default: GPT-6 Luna',
   },
   {
-    id: 'gpt-5.6-sol',
-    label: 'Strong: GPT-5.6 Sol',
+    id: 'gpt-6.1-sol',
+    label: 'Strong: GPT-6.1 Sol',
   },
   {
-    id: 'gpt-5.6-luna',
-    label: 'Fast: GPT-5.6 Luna',
+    id: 'gpt-6-astra',
+    label: 'GPT-6 Astra',
   },
   {
     id: FALLBACK_OPENAI_MODEL,
@@ -72,13 +73,13 @@ const OPENAI_MODELS = Object.freeze([
   },
 ]);
 const OPENAI_MODEL_REASONING_EFFORTS = new Map([
-  [DEFAULT_OPENAI_MODEL, CODEX_REASONING_EFFORT],
+  [DEFAULT_OPENAI_MODEL, DEFAULT_OPENAI_REASONING_EFFORT],
   [FALLBACK_OPENAI_MODEL, CODEX_REASONING_EFFORT],
-  ['gpt-5.6-sol', 'medium'],
-  ['gpt-5.6-luna', 'medium'],
   ['gpt-6-astra', CODEX_REASONING_EFFORT],
   ['gpt-6-sol', CODEX_REASONING_EFFORT],
-  ['gpt-6-luna', CODEX_REASONING_EFFORT],
+  ['gpt-5.6-terra', CODEX_REASONING_EFFORT],
+  ['gpt-5.6-sol', 'medium'],
+  ['gpt-5.6-luna', 'medium'],
 ]);
 
 /** @param {string} [detail] */

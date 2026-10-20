@@ -9,7 +9,6 @@ const {
   narrativeWalkthroughSchema,
   normalizeNarrativeWalkthrough,
   readNarrativeWalkthrough,
-  resolveNarrativeWalkthroughModel,
 } = require('../narrative-walkthrough.cjs') as {
   buildNarrativeWalkthroughPrompt: (
     state: any,
@@ -49,12 +48,6 @@ const {
     customPrompt?: string,
     previousWalkthrough?: unknown,
   ) => Promise<any>;
-  resolveNarrativeWalkthroughModel: (
-    state: any,
-    agent: any,
-    model: unknown,
-    reasoningEffort?: string,
-  ) => string;
 };
 
 const addedPatch = (count: number) =>
@@ -450,57 +443,6 @@ test.each([
     expect(prompt).toContain(chapters);
   },
 );
-
-test('uses GPT-5.5 for large walkthroughs only with automatic effort on the default model', () => {
-  const createState = (hunkCount: number) => ({
-    branch: 'main',
-    files: [
-      {
-        path: 'large.ts',
-        sections: [
-          {
-            id: 'large.ts:staged',
-            kind: 'staged',
-            patch: Array.from(
-              { length: hunkCount },
-              (_, index) => `@@ -${index + 1} +${index + 1} @@\n-old ${index}\n+new ${index}\n`,
-            ).join(''),
-          },
-        ],
-        status: 'modified',
-      },
-    ],
-    generatedAt: 1,
-    root: '/repo',
-    source: { type: 'working-tree' },
-  });
-  const codexAgent = {
-    defaultModel: 'gpt-5.6-terra',
-    fallbackModel: 'gpt-5.5',
-    id: 'codex',
-    normalizeModel: (model: unknown) => String(model),
-  };
-
-  expect(resolveNarrativeWalkthroughModel(createState(99), codexAgent, 'gpt-5.6-terra')).toBe(
-    'gpt-5.6-terra',
-  );
-  expect(resolveNarrativeWalkthroughModel(createState(100), codexAgent, 'gpt-5.6-terra')).toBe(
-    'gpt-5.5',
-  );
-  expect(
-    resolveNarrativeWalkthroughModel(createState(100), codexAgent, 'gpt-5.6-terra', 'max'),
-  ).toBe('gpt-5.6-terra');
-  expect(resolveNarrativeWalkthroughModel(createState(100), codexAgent, 'gpt-5.6-sol')).toBe(
-    'gpt-5.6-sol',
-  );
-  expect(
-    resolveNarrativeWalkthroughModel(
-      createState(100),
-      { ...codexAgent, id: 'claude' },
-      'claude-sonnet',
-    ),
-  ).toBe('claude-sonnet');
-});
 
 test('prompts generated walkthroughs with custom user guidance without replacing core constraints', () => {
   const prompt = buildNarrativeWalkthroughPrompt(

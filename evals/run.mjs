@@ -22,7 +22,6 @@ const { readRepositoryState } = require('../electron/git-state.cjs');
 const {
   buildNarrativeWalkthroughPrompt,
   readNarrativeWalkthrough,
-  resolveNarrativeWalkthroughModel,
 } = require('../electron/narrative-walkthrough.cjs');
 const { resolveReviewUrl } = require('../electron/review-source.cjs');
 
@@ -122,15 +121,12 @@ for (const evalCase of cases) {
       await writeFile(join(attemptDir, 'source-description.txt'), state.source.description);
     }
 
-    const caseModel = productionDefaults
-      ? resolveNarrativeWalkthroughModel(state, baseAgent, model)
-      : model;
     let rawResponse = '';
     let actualPrompt = '';
     let agentStartedAt = 0;
     let agentFinishedAt = 0;
     let agentMetrics = null;
-    let actualModel = caseModel;
+    let actualModel = model;
     const phases = [];
     const generationStarted = nowMs();
     const agent = {
@@ -152,7 +148,7 @@ for (const evalCase of cases) {
       agent,
       {
         fallbackModel: baseAgent.fallbackModel,
-        model: caseModel,
+        model,
         onMetrics: (metrics) => {
           agentMetrics = metrics;
         },
@@ -192,7 +188,7 @@ for (const evalCase of cases) {
       firstResponseMs: firstResponse?.elapsedMs ?? null,
       generationMs: roundMs(generationFinished - generationStarted),
       metrics: result.status === 'ready' ? getWalkthroughMetrics(state, result.walkthrough) : null,
-      model: caseModel,
+      model,
       phases,
       postprocessMs: agentFinishedAt ? roundMs(generationFinished - agentFinishedAt) : null,
       promptBuildMs,

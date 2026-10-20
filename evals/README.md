@@ -38,7 +38,7 @@ regression greater than 5% with a 3ms noise floor.
 
 Use `--case small` to run one case. The model defaults to the current Codiff
 `openAIModel` setting and can be overridden with `--model`. Use `--production-defaults`
-to evaluate the built-in default model and its large-walkthrough routing.
+to evaluate the built-in default model.
 
 Generated artifacts stay under ignored `evals/runs/<label>/`. Each attempt contains the
 prompt, raw response, normalized walkthrough, timings, phase events, usage, deterministic

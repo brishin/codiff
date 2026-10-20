@@ -94,7 +94,6 @@ const {
   getNarrativeWalkthroughCacheKey,
   normalizeNarrativeWalkthrough,
   readNarrativeWalkthrough,
-  resolveNarrativeWalkthroughModel,
 } = require('./narrative-walkthrough.cjs');
 const { readStoredWalkthrough, writeStoredWalkthrough } = require('./walkthrough-store.cjs');
 const { uploadSharedSnapshot } = require('./shared-walkthrough-upload.cjs');
@@ -1755,12 +1754,7 @@ ipcMain.handle('codiff:getNarrativeWalkthrough', async (event, source, options) 
       await agent.readSessionContext(launchOptions?.[agent.sessionLaunchOptionKey]),
     );
     const agentOptions = getAgentOptions(agent);
-    const walkthroughModel = resolveNarrativeWalkthroughModel(
-      state,
-      agent,
-      agentOptions.model,
-      agentOptions.reasoningEffort,
-    );
+    const walkthroughModel = agent.normalizeModel(agentOptions.model);
     const walkthroughPrompt = config.settings.walkthroughPrompt;
     const cacheKey = getNarrativeWalkthroughCacheKey(
       state,
